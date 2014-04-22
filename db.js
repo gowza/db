@@ -13,19 +13,111 @@ module.paths = module.parent.paths;
 
 var mysql = require('mysql'),
   config = require('config'),
+  pool = mysql.createPool(config.db),
   fs = require('fs'),
-  is = require('is'),
-  pool;
-
+  is = require('is');
 
 function noop() {}
 
+function escape(query, inserts) {
+  return query.replace(/\?/g, function (match, i) {
+    if (inserts.length === 0) {
+      return match;
+    }
+
+    // If the ? is following a WHERE and the param is an object
+    // there are some special use cases
+    if (
+      /WHERE[\s]*$/.test(query.slice(0, i))
+    ) {
+      return escape.WHERE(inserts.shift());
+    }
+
+    return mysql.escape(inserts.shift());
+  });
+}
+
+escape.WHERE = function WHERE(paramObj) {
+  var sql = '';
+
+  function b(string) {
+    return '(' + string + ')';
+  }
+
+  function handle(key, value) {
+    var isMultiple = is.array(value),
+      isNot = (/([!<>])$/).exec(key);
+
+    // Password Syntax:
+    // "password!": "Pass1234"
+    // "password": ["Pass1234", "Pass12343"]
+    // "password": ["Pass1234", "Pass12343"]
+    if (/password!?$/.test(key)) {
+      sql += 'password ';
+
+      if (isMultiple) {
+        sql += isNot ? 'NOT IN' : 'IN';
+
+        sql += b(value
+          .map(function (individualValue) {
+            return 'SHA1' + b(mysql.escape(individualValue));
+          })
+          .join(', '));
+      } else {
+        sql += (isNot ? '!' : '');
+
+        sql += '= SHA1' + b(mysql.escape(value));
+      }
+    }
+
+    // LIKE Syntax:
+    // "col LIKE": "val%"
+    // "col LIKE": ["val%", "%ue", "%alu%"]
+    // "col NOT LIKE": ["val%", "%ue", "%alu%"]
+    if (/ LIKE( |$)/.test(key)) {
+      if (isMultiple) {
+        sql += b(value.map(function (value) {
+          return key + ' ' + mysql.escape(value);
+        }).join(' || '));
+      } else {
+        sql += key + ' ' + mysql.escape(value);
+      }
+    }
+
+    // || Syntax:
+    // "||": {
+    //   "key": "val",
+    //   "key2": "val2"
+    // },
+    // "||": [{
+    //   "key": "val",
+    //   "key2": "val2"
+    // }, ...]
+    if (key === "||") {
+      throw new Error("|| syntax not ready yet");
+    }
+
+    if (isMultiple) {
+      sql += (isNot ? key.slice(0, -1) : key) + ' ' + (isNot ? 'NOT ' : '') + 'IN' + b(mysql.escape(value));
+    }
+
+    sql += (isNot ? key.slice(0, -1) : key) + ' ' + (isNot ? isNot[1] : '') + '= ' + mysql.escape(value);
+
+    sql += ' && ';
+  }
+
+  Object.keys(paramObj)
+    .forEach(function (key) {
+      handle(key, paramObj[key]);
+    });
+
+  return sql.slice(0, -4);
+};
+
+pool.config.connectionConfig.queryFormat = escape;
+
 function db(sql, param, callback) {
   var statistics;
-
-  if (!pool) {
-    pool = mysql.createPool(config.db);
-  }
 
   if (arguments.length === 2) {
     if (is.array(param)) {
@@ -111,6 +203,7 @@ function db(sql, param, callback) {
       }
 
       if (err) {
+        console.log(sql, param);
         throw err;
       }
 
