@@ -9,13 +9,16 @@
 
 // Since this module is loaded as a symlink, it can be 
 // best to use the parent's require path
+
 module.paths = module.parent.paths;
 
 var mysql = require('mysql'),
   config = require('config'),
   pool = mysql.createPool(config.db),
+  path = require('path'),
   fs = require('fs'),
-  is = require('is');
+  is = require('is'),
+  statistics = [];
 
 function noop() {}
 
@@ -28,7 +31,8 @@ function escape(query, inserts) {
     // If the ? is following a WHERE and the param is an object
     // there are some special use cases
     if (
-      /WHERE[\s]*$/.test(query.slice(0, i))
+      /WHERE[\s]*$/.test(query.slice(0, i)) &&
+        is.baseObject(inserts[0])
     ) {
       return escape.WHERE(inserts.shift());
     }
@@ -116,6 +120,50 @@ escape.WHERE = function WHERE(paramObj) {
 
 pool.config.connectionConfig.queryFormat = escape;
 
+function manageQueryStatistic(statObject) {
+  var fileContents = statObject.file + ' Statistics\n\n';
+
+  function avg(arr, key) {
+    var sum = 0,
+      totalEntires = 0,
+      i = arr.length;
+
+    while (i !== 0) {
+      i -= 1;
+
+      if (arr[i].hasOwnProperty(key)) {
+        totalEntires += 1;
+        sum += arr[i][key];
+      }
+    }
+
+    return sum / totalEntires;
+  }
+
+  Object.keys(statObject)
+    .forEach(function (sql) {
+      var statistics = statObject[sql];
+
+      if (sql === 'file') {
+        return;
+      }
+
+      fileContents += ' \n' + statistics.name + '\n';
+
+      if (statistics.invocations.length === 0) {
+        fileContents += '(N/A)\n';
+        return;
+      }
+
+      fileContents += 'Invocations: ' + statistics.invocations.length + '\n';
+      fileContents += 'Average getConnection: ' + avg(statistics.invocations, 'gotConnection') + '\n';
+      fileContents += 'Average releaseConnection: ' + avg(statistics.invocations, 'releasedConnection') + '\n';
+      fileContents += 'Average queryTime: ' + avg(statistics.invocations, 'queryTime') + '\n';
+    });
+
+  fs.writeFileSync(config.dir + '/var/db/' + statObject.file.replace(/\//g, '-') + '.stats', fileContents);
+}
+
 function db(sql, param, callback) {
   var statistics;
 
@@ -133,7 +181,10 @@ function db(sql, param, callback) {
     }
   }
 
-  if (this) {
+  if (
+    this &&
+      config.mode === "debug"
+  ) {
     statistics = {
       "started": Date.now()
     };
@@ -217,17 +268,27 @@ db.load = function (file) {
     match,
     contents,
     queryObject = {
-      "query": db,
-      "statistics": {}
+      "query": db
     };
 
   function makeQuery(name, sql) {
-    queryObject.statistics[sql] = {
-      "name": name,
-      "invocations": []
-    };
+    if (config.mode === "debug") {
+      if (!queryObject.hasOwnProperty('statistics')) {
+        queryObject.statistics = {
+          "file": file
+        };
+
+        statistics.push(queryObject.statistics);
+      }
+
+      queryObject.statistics[sql] = {
+        "name": name,
+        "invocations": []
+      };
+    }
 
     queryObject[name] = db.bind(queryObject, sql);
+    queryObject[name].sql = sql.trim().replace(/;$/, '');
   }
 
   contents = fs.readFileSync(file, 'ascii');
@@ -238,51 +299,14 @@ db.load = function (file) {
     match = sqlRe.exec(contents);
   }
 
-  process.on("exit", function () {
-    var fileContents = file + ' Statistics\n\n';
-
-    console.log("printing statistics");
-
-    function avg(arr, key) {
-      var sum = 0,
-        totalEntires = 0,
-        i = arr.length;
-
-      while (i !== 0) {
-        i -= 1;
-
-        if (arr[i].hasOwnProperty(key)) {
-          totalEntires += 1;
-          sum += arr[i][key];
-        }
-      }
-
-      return sum / totalEntires;
-    }
-
-    Object.keys(queryObject.statistics)
-      .forEach(function (sql) {
-        var statistics = queryObject.statistics[sql];
-
-        fileContents += ' \n' + statistics.name + '\n';
-
-        if (statistics.invocations.length === 0) {
-          fileContents += '(N/A)\n';
-          return;
-        }
-
-        fileContents += 'Invocations: ' + statistics.invocations.length + '\n';
-        fileContents += 'Average getConnection: ' + avg(statistics.invocations, 'gotConnection') + '\n';
-        fileContents += 'Average releaseConnection: ' + avg(statistics.invocations, 'releasedConnection') + '\n';
-        fileContents += 'Average queryTime: ' + avg(statistics.invocations, 'queryTime') + '\n';
-      });
-
-    console.log("saving statistics");
-    fs.writeFileSync(file + '.stats', fileContents);
-  });
-
   return queryObject;
 };
+
+if (config.mode === "debug") {
+  process.on("exit", function () {
+    statistics.forEach(manageQueryStatistic);
+  });
+}
 
 process.on('SIGINT', process.exit);
 
