@@ -23,7 +23,6 @@ var mysql = require('mysql'),
 function noop() {}
 
 function escape(query, inserts) {
-  console.log(query, inserts);
   inserts = inserts.concat();
 
   return query.replace(/\?/g, function (match, i) {
