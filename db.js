@@ -23,6 +23,9 @@ var mysql = require('mysql'),
 function noop() {}
 
 function escape(query, inserts) {
+  console.log(query, inserts);
+  inserts = inserts.concat();
+
   return query.replace(/\?/g, function (match, i) {
     if (inserts.length === 0) {
       return match;
@@ -52,11 +55,12 @@ escape.WHERE = function WHERE(paramObj) {
     var isMultiple = is.array(value),
       isNot = (/([!<>])$/).exec(key);
 
-    // Password Syntax:
-    // "password!": "Pass1234"
-    // "password": ["Pass1234", "Pass12343"]
-    // "password": ["Pass1234", "Pass12343"]
     if (/password!?$/.test(key)) {
+
+      // Password Syntax:
+      // "password!": "Pass1234"
+      // "password": ["Pass1234", "Pass12343"]
+      // "password": ["Pass1234", "Pass12343"]
       sql += 'password ';
 
       if (isMultiple) {
@@ -72,13 +76,12 @@ escape.WHERE = function WHERE(paramObj) {
 
         sql += '= SHA1' + b(mysql.escape(value));
       }
-    }
+    } else if (/ LIKE( |$)/.test(key)) {
 
-    // LIKE Syntax:
-    // "col LIKE": "val%"
-    // "col LIKE": ["val%", "%ue", "%alu%"]
-    // "col NOT LIKE": ["val%", "%ue", "%alu%"]
-    if (/ LIKE( |$)/.test(key)) {
+      // LIKE Syntax:
+      // "col LIKE": "val%"
+      // "col LIKE": ["val%", "%ue", "%alu%"]
+      // "col NOT LIKE": ["val%", "%ue", "%alu%"]
       if (isMultiple) {
         sql += b(value.map(function (value) {
           return key + ' ' + mysql.escape(value);
@@ -86,26 +89,32 @@ escape.WHERE = function WHERE(paramObj) {
       } else {
         sql += key + ' ' + mysql.escape(value);
       }
-    }
+    } else if (key === "||") {
 
-    // || Syntax:
-    // "||": {
-    //   "key": "val",
-    //   "key2": "val2"
-    // },
-    // "||": [{
-    //   "key": "val",
-    //   "key2": "val2"
-    // }, ...]
-    if (key === "||") {
-      throw new Error("|| syntax not ready yet");
-    }
+      // || Syntax:
+      // "||": {
+      //   "key": "val",
+      //   "key2": "val2"
+      // },
+      // "||": [{
+      //   "key": "val",
+      //   "key2": "val2"
+      // }, ...]
+      if (isMultiple) {
+        sql += value.map(function (item) {
+          return b(escape.WHERE(item).replace(/ && /g, ' || '));
+        }).join(' && ');
+      } else {
+        sql += b(escape.WHERE(value).replace(/ && /g, ' || '));
+      }
+    } else {
 
-    if (isMultiple) {
-      sql += (isNot ? key.slice(0, -1) : key) + ' ' + (isNot ? 'NOT ' : '') + 'IN' + b(mysql.escape(value));
+      if (isMultiple) {
+        sql += (isNot ? key.slice(0, -1) : key) + ' ' + (isNot ? 'NOT ' : '') + 'IN' + b(mysql.escape(value));
+      } else {
+        sql += (isNot ? key.slice(0, -1) : key) + ' ' + (isNot ? isNot[1] : '') + '= ' + mysql.escape(value);
+      }
     }
-
-    sql += (isNot ? key.slice(0, -1) : key) + ' ' + (isNot ? isNot[1] : '') + '= ' + mysql.escape(value);
 
     sql += ' && ';
   }
