@@ -187,6 +187,8 @@ function db(sql, param, callback) {
       callback = param;
       param = [];
     }
+  } else if (!is.func(callback)) {
+    callback = noop;
   }
 
   if (
