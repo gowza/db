@@ -187,7 +187,7 @@ function db(sql, param, callback) {
       callback = param;
       param = [];
     }
-  } else if (!is.func(callback)) {
+  } else if (!is.object(callback)) {
     callback = noop;
   }
 
@@ -215,6 +215,7 @@ function db(sql, param, callback) {
     }
 
     if (is.baseObject(callback)) {
+
       callback.row = callback.row || callback.result || noop;
       max = callback.concurrency || Infinity;
       concurrency = 0;
