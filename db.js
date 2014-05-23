@@ -25,9 +25,13 @@ function noop() {}
 function escape(query, inserts) {
   inserts = inserts.concat();
 
-  return query.replace(/\?/g, function (match, i) {
+  return query.replace(/\??\?/g, function (match, i) {
     if (inserts.length === 0) {
       return match;
+    }
+
+    if (match === '??') {
+      return mysql.escapeId(inserts.shift());
     }
 
     // If the ? is following a WHERE and the param is an object
@@ -193,7 +197,8 @@ function db(sql, param, callback) {
 
   if (
     this &&
-      config.mode === "debug"
+      this.statistics &&
+      this.statistics.hasOwnProperty(sql)
   ) {
     statistics = {
       "started": Date.now()
