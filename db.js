@@ -7,11 +7,6 @@
 
 "use strict";
 
-// Since this module is loaded as a symlink, it can be 
-// best to use the  parent's require path
-
-module.paths = module.parent.paths;
-
 var mysql = require('mysql'),
   config = require('config'),
   pool = mysql.createPool(config.db),
