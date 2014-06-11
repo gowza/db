@@ -110,7 +110,12 @@ escape.WHERE = function WHERE(paramObj) {
       if (isMultiple) {
         sql += (isNot ? key.slice(0, -1) : key) + ' ' + (isNot ? 'NOT ' : '') + 'IN' + b(mysql.escape(value));
       } else {
-        sql += (isNot ? key.slice(0, -1) : key) + ' ' + (isNot ? isNot[1] : '') + '= ' + mysql.escape(value);
+        sql += (isNot ? key.slice(0, -1) : key) + ' ';
+        if (value === null) {
+          sql += 'IS ' + (isNot ? 'NOT ' : '') + 'NULL';
+        } else {
+          sql += (isNot ? isNot[1] : '') + '= ' + mysql.escape(value);
+        }
       }
     }
 
