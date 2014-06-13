@@ -105,6 +105,22 @@ escape.WHERE = function WHERE(paramObj) {
       } else {
         sql += b(escape.WHERE(value).replace(/ && /g, ' || '));
       }
+    } else if (key === "&&") {
+
+      // || Syntax:
+      // "||": {
+      //   "key": "val",
+      //   "key2": "val2"
+      // },
+      // "||": [{
+      //   "key": "val",
+      //   "key2": "val2"
+      // }, ...]
+      if (isMultiple) {
+        sql += b(value.map(function (item) {
+          return b(escape.WHERE(item));
+        }).join(' || '));
+      }
     } else {
 
       if (isMultiple) {
@@ -318,11 +334,19 @@ db.load = function (file) {
   return queryObject;
 };
 
+db.debugQuery = function debugQuery(sql, param) {
+  console.log(sql);
+  console.log(JSON.stringify(param, '', 0));
+  console.log(escape(sql, param));
+};
+
 if (config.mode === "debug") {
   process.on("exit", function () {
     statistics.forEach(manageQueryStatistic);
   });
 }
+
+
 
 process.on('SIGINT', process.exit);
 
