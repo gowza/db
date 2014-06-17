@@ -31,11 +31,12 @@ function escape(query, inserts) {
 
     // If the ? is following a WHERE and the param is an object
     // there are some special use cases
-    if (
-      /WHERE[\s]*$/.test(query.slice(0, i)) &&
-        is.baseObject(inserts[0])
-    ) {
-      return escape.WHERE(inserts.shift());
+    if (is.baseObject(inserts[0])) {
+      if (/WHERE[\s]*$/.test(query.slice(0, i))) {
+        return escape.WHERE(inserts.shift());
+      }
+
+      return escape.SET(inserts.shift());
     }
 
     return mysql.escape(inserts.shift());
@@ -144,6 +145,28 @@ escape.WHERE = function WHERE(paramObj) {
     });
 
   return sql.slice(0, -4);
+};
+
+escape.SET = function SET(paramObj) {
+  var sql = '',
+    key;
+
+  for (key in paramObj) {
+    if (
+      paramObj.hasOwnProperty(key) &&
+        !is.func(paramObj[key])
+    ) {
+      sql += mysql.escapeId(key) + ' = ';
+
+      if (key === 'password') {
+        sql += 'SHA1(' + mysql.escape(paramObj[key]) + '), ';
+      } else {
+        sql += mysql.escape(paramObj[key]) + ', ';
+      }
+    }
+  }
+
+  return sql.slice(0, -2);
 };
 
 pool.config.connectionConfig.queryFormat = escape;
