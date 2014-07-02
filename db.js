@@ -18,7 +18,7 @@ var mysql = require('mysql'),
 function noop() {}
 
 function escape(query, inserts) {
-  inserts = inserts.concat();
+  inserts = [].concat(inserts);
 
   return query.replace(/\??\?/g, function (match, i) {
     if (inserts.length === 0) {
@@ -343,7 +343,6 @@ db.load = function (file) {
     }
 
     queryObject[name] = db.bind(queryObject, sql);
-    queryObject[name].sql = sql.trim().replace(/;$/, '');
   }
 
   contents = fs.readFileSync(file, 'ascii');
