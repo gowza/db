@@ -319,12 +319,15 @@ function db(sql, param, callback) {
 }
 
 db.load = function (file) {
-  var sqlRe = /\/\*([a-zA-Z]+)\*\/([^\/]+)/g,
+  var sqlRe = /\/\*([a-zA-Z]+)\*\/((?:[^"'\/]+|'[^']+'|"[^"]+")+)/g,
     match,
     contents,
     queryObject = {
-      "query": db
+      "query": db,
+      "sql": {}
     };
+
+  sqlRe = /\/\*([a-zA-Z]+)\*\/([\s\S]+?)(?=\/\*|$)/g;
 
   function makeQuery(name, sql) {
     if (config.mode === "debug") {
@@ -343,6 +346,7 @@ db.load = function (file) {
     }
 
     queryObject[name] = db.bind(queryObject, sql);
+    queryObject.sql[name] = sql;
   }
 
   contents = fs.readFileSync(file, 'ascii');
