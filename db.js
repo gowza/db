@@ -17,29 +17,39 @@ var mysql = require('mysql'),
 
 function noop() {}
 
+
 function escape(query, inserts) {
   inserts = [].concat(inserts);
 
   return query.replace(/\??\?/g, function (match, i) {
+    var insert;
+
     if (inserts.length === 0) {
       return match;
     }
 
+    insert = inserts.shift();
+
     if (match === '??') {
-      return mysql.escapeId(inserts.shift());
+      if (/ORDER BY[\s]*$/.test(query.slice(0, i))) {
+        insert = insert.split(' ');
+        return mysql.escapeId(insert[0]) + ' ' + (insert[1] === 'ASC' ? 'ASC' : 'DESC');
+      }
+
+      return mysql.escapeId(insert);
     }
 
     // If the ? is following a WHERE and the param is an object
     // there are some special use cases
-    if (is.baseObject(inserts[0])) {
+    if (is.baseObject(insert)) {
       if (/WHERE[\s]*$/.test(query.slice(0, i))) {
-        return escape.WHERE(inserts.shift());
+        return escape.WHERE(insert);
       }
 
-      return escape.SET(inserts.shift());
+      return escape.SET(insert);
     }
 
-    return mysql.escape(inserts.shift());
+    return mysql.escape(insert);
   });
 }
 
