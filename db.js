@@ -340,7 +340,7 @@ db.load = function (file) {
   sqlRe = /\/\*([a-zA-Z]+)\*\/([\s\S]+?)(?=\/\*|$)/g;
 
   function makeQuery(name, sql) {
-    if (config.mode === "debug") {
+    if (/^debug/.test(config.mode)) {
       if (!queryObject.hasOwnProperty('statistics')) {
         queryObject.statistics = {
           "file": file
@@ -376,7 +376,7 @@ db.debugQuery = function debugQuery(sql, param) {
   console.log(escape(sql, param));
 };
 
-if (config.mode === "debug") {
+if (/^debug/.test(config.mode)) {
   process.on("exit", function () {
     statistics.forEach(manageQueryStatistic);
   });
