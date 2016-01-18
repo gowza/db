@@ -1,0 +1,17 @@
+{
+  "name": "db",
+  "version": "1.0.0",
+  "description": "",
+  "main": "db.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/roderickObrist/db.git"
+  },
+  "author": "Roderick Obrist",
+  "license": "UNLICENSED",
+  "private": true,
+  "bugs": {
+    "url": "https://github.com/roderickObrist/db/issues"
+  },
+  "homepage": "https://github.com/roderickObrist/db#readme"
+}
