@@ -15,6 +15,17 @@ var mysql = require('mysql'),
   is = require('is'),
   statistics = [];
 
+/*
+ * Patch node-mysql SqlString.dateToString to remove miliseconds from Date.
+ */
+let SqlString = require(config.dir + '/node_modules/mysql/lib/protocol/SqlString');
+let dateToString = SqlString.dateToString;
+
+SqlString.dateToString = function () {
+  return dateToString.apply(this, arguments).slice(0, -4);
+}
+
+
 function noop() {}
 
 
