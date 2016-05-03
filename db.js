@@ -21,8 +21,8 @@ var mysql = require('mysql'),
 let SqlString = require(config.dir + '/node_modules/mysql/lib/protocol/SqlString');
 let dateToString = SqlString.dateToString;
 
-SqlString.dateToString = (date) => {
-  return dateToString(date).slice(0, -4);
+SqlString.dateToString = function () {
+  return dateToString(...arguments).slice(0, -4);
 }
 
 
