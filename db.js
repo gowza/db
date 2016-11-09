@@ -22,7 +22,7 @@ let SqlString = require(config.dir + '/node_modules/mysql/lib/protocol/SqlString
 let dateToString = SqlString.dateToString;
 
 SqlString.dateToString = function () {
-  return dateToString.apply(this, arguments).slice(0, -4);
+  return dateToString.apply(this, arguments).replace(/\.[0-9]{3}/, '');
 }
 
 
