@@ -10,20 +10,9 @@
 var mysql = require('mysql'),
   config = require('config'),
   pool = mysql.createPool(config.db),
-  path = require('path'),
   fs = require('fs'),
   is = require('is'),
   statistics = [];
-
-/*
- * Patch node-mysql SqlString.dateToString to remove miliseconds from Date.
- */
-let SqlString = require(config.dir + '/node_modules/mysql/lib/protocol/SqlString');
-let dateToString = SqlString.dateToString;
-
-SqlString.dateToString = function () {
-  return dateToString.apply(this, arguments).replace(/\.[0-9]{3}/, '');
-}
 
 
 function noop() {}
